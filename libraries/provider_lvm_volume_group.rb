@@ -122,6 +122,13 @@ class Chef
       def create_volume_group(lvm, physical_volume_list, name)
         if lvm.volume_groups[name]
           Chef::Log.info "Volume group '#{name}' already exists. Not creating..."
+          physical_volume_list.each do |pv|
+            command = "pvdisplay #{pv}| grep \"VG Name\"| grep -qs #{name} || vgextend #{name} #{pv}"
+            Chef::Log.debug "Executing extend lvm command: '#{command}'"
+            output = lvm.raw command
+            Chef::Log.debug "Command output: '#{output}'"
+            new_resource.updated_by_last_action(true)
+          end
         else
           physical_volumes = physical_volume_list.join(' ')
           physical_extent_size = new_resource.physical_extent_size ? "-s #{new_resource.physical_extent_size}" : ''
