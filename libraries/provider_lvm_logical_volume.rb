@@ -51,9 +51,7 @@ class Chef
         updates = []
 
         vg = lvm.volume_groups[group]
-        # Create the logical volume
-        if vg.nil? || vg.logical_volumes.select { |lv| lv.name == name }.empty?
-          size =
+        size =
             case new_resource.size
             when /\d+[kKmMgGtT]/
               "--size #{new_resource.size}"
@@ -62,6 +60,8 @@ class Chef
             when /(\d+)/
               "--size #{$1}" # rubocop:disable PerlBackrefs
             end
+        # Create the logical volume
+        if vg.nil? || vg.logical_volumes.select { |lv| lv.name == name }.empty?
 
           stripes = new_resource.stripes ? "--stripes #{new_resource.stripes}" : ''
           stripe_size = new_resource.stripe_size ? "--stripesize #{new_resource.stripe_size}" : ''
@@ -77,6 +77,14 @@ class Chef
           updates << true
         else
           lv = vg.logical_volumes.select { |v| v.name == name }.first
+
+          # Try to resize:
+          command = "lvextend #{device_name} #{size} || true"
+          Chef::Log.debug "Executing lvm command: '#{command}'"
+          output = lvm.raw(command)
+          Chef::Log.debug "Command output: '#{output}'"
+          updates << true
+
           if !lv.state.nil? && lv.state.to_sym == :active
             Chef::Log.info "Logical volume '#{name}' already exists and active. Not creating..."
           else
